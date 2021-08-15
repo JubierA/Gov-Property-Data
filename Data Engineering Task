@@ -1,0 +1,44 @@
+import pandas as pd
+import json
+
+#data = pd.read_csv('http://prod.publicdata.landregistry.gov.uk.s3-website-eu-west-1.amazonaws.com/pp-complete.csv')
+
+#https://www.gov.uk/guidance/about-the-price-paid-data#explanations-of-column-headers-in-the-ppd
+header_list = ["TransactionID","Price", "Date","PostCode", "Type","New","Tenure","PriAddress","SecAddress","Street","Locality"
+              ,"Town/City","District","County","PPD","Status"]
+
+#df= pd.read_csv('http://prod.publicdata.landregistry.gov.uk.s3-website-eu-west-1.amazonaws.com/pp-complete.csv', names=header_list, index_col=None)
+df = pd.read_csv('C:\\Users\\Jubier\\Downloads\\pp-complete.csv', names=header_list, index_col=None)
+
+df = df.drop(['TransactionID', 'Locality','Status','District'], axis=1)
+#Include all appropriate fields, the above are not required
+
+
+
+# Creating unique addresses - the unique property ID will be based on this. Secondary addresses are important to include due to Flats having the same primary address. 
+
+df['UniqueAddress'] =  df['SecAddress'].fillna('') + ', ' +df['PriAddress'].fillna('') + ', ' + df['Street'].fillna('')  + ', ' +  df['PostCode'].fillna('') 
+
+# bit messy if no secondary address but this is only used to create the unique address, it'll be dropped when no longer required. 
+# can use regex to remove commas in the future
+
+
+
+#Each Unique Address is given a sequencial ID. 
+
+df['UniqueID'] = df.groupby(['UniqueAddress']).grouper.group_info[0]
+
+df = df.drop(['UniqueAddress'], axis=1)
+
+header_list = ["UniqueID","Price", "Date","PostCode", "Type","New","Tenure","PriAddress","SecAddress","Street"
+              ,"Town/City","County","PPD"]
+
+df = df[header_list].sort_values(by='UniqueID', ascending=True)
+
+
+
+j = (df.groupby(['UniqueID','PostCode','PriAddress','SecAddress','Street','Town/City','County'])
+       .apply(lambda x: x[['Date','Price','Type','New','Tenure','PPD']].to_dict('records'))
+       .reset_index()
+       .rename(columns={0:'Data'})
+       .to_json(r'C:\\Users\\Jubier\\Downloads\\pp-complete.json',orient='records'))
